@@ -1,479 +1,311 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Brain, 
-  Settings, 
-  Workflow, 
-  FlaskConical, 
-  Zap, 
-  CheckCircle2, 
-  ArrowRight, 
-  Sparkles, 
-  BookOpen, 
-  Clock, 
-  Moon, 
-  Coffee,
-  Lightbulb,
-  MessageSquare
-} from 'lucide-react';
-import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title } from 'chart.js';
-import { Doughnut, Line, Bar } from 'react-chartjs-2';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CognitionOS | Building a Personalized Learning System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap');
+        
+        :root {
+            --bg-primary: #f8fafc;
+            --text-main: #1e293b;
+            --accent: #2563eb;
+        }
 
-ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title);
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            scroll-behavior: smooth;
+        }
 
-const apiKey = ""; // API key is provided by the environment
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid #e2e8f0;
+        }
 
-const App = () => {
-  const [activeTab, setActiveTab] = useState('bio');
-  const [user, setUser] = useState(null);
-  const [journalEntries, setJournalEntries] = useState([]);
-  const [paraTab, setParaTab] = useState('projects');
-  const [workflowStep, setWorkflowStep] = useState(0);
-  const [isGenerating, setIsGenerating] = useState(false);
+        .card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 1rem;
+            transition: transform 0.2s ease, shadow 0.2s ease;
+        }
 
-  // Gemini API helper with exponential backoff
-  const callGemini = async (prompt, systemPrompt = "You are a helpful neuro-productivity expert.") => {
-    let delay = 1000;
-    for (let i = 0; i < 5; i++) {
-      try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            systemInstruction: { parts: [{ text: systemPrompt }] }
-          })
-        });
-        if (!response.ok) throw new Error('API request failed');
-        const data = await response.json();
-        return data.candidates?.[0]?.content?.parts?.[0]?.text;
-      } catch (err) {
-        if (i === 4) throw err;
-        await new Promise(resolve => setTimeout(resolve, delay));
-        delay *= 2;
-      }
-    }
-  };
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
 
-  const tabs = [
-    { id: 'bio', label: '1. Bio-Hardware', icon: <Moon size={18} /> },
-    { id: 'os', label: '2. Knowledge OS', icon: <Settings size={18} /> },
-    { id: 'workflow', label: '3. Workflow Engine', icon: <Workflow size={18} /> },
-    { id: 'lab', label: '4. Learning Lab', icon: <FlaskConical size={18} /> },
-    { id: 'action', label: '5. Action Center', icon: <Zap size={18} /> },
-  ];
+        .sidebar-link {
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
 
-  return (
-    <div className="min-h-screen bg-[#F9FAFB] text-[#374151] font-sans">
-      {/* Navigation */}
-      <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 flex justify-between h-16 items-center">
-          <div className="flex items-center gap-2">
-            <div className="bg-blue-600 p-1.5 rounded-lg text-white">
-              <Brain size={24} />
-            </div>
-            <span className="text-xl font-bold tracking-tight">Neuro<span className="text-blue-600">Hub</span></span>
-          </div>
-          <div className="hidden md:flex space-x-6">
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-3 py-2 text-sm font-medium transition-all border-b-2 ${
-                  activeTab === tab.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-900'
-                }`}
-              >
-                {tab.icon}
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </nav>
+        .sidebar-link:hover {
+            background: #f1f5f9;
+            border-left-color: var(--accent);
+            padding-left: 1.25rem;
+        }
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        {activeTab === 'bio' && <BioHardwareView />}
-        {activeTab === 'os' && <KnowledgeOSView paraTab={paraTab} setParaTab={setParaTab} />}
-        {activeTab === 'workflow' && <WorkflowView callGemini={callGemini} isGenerating={isGenerating} setIsGenerating={setIsGenerating} />}
-        {activeTab === 'lab' && <LearningLabView callGemini={callGemini} isGenerating={isGenerating} setIsGenerating={setIsGenerating} />}
-        {activeTab === 'action' && <ActionCenterView callGemini={callGemini} journalEntries={journalEntries} setJournalEntries={setJournalEntries} isGenerating={isGenerating} setIsGenerating={setIsGenerating} />}
-      </main>
-    </div>
-  );
-};
+        .math-block {
+            background: #f1f5f9;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            font-family: 'JetBrains Mono', monospace;
+            display: inline-block;
+        }
 
-const BioHardwareView = () => {
-  const sleepData = {
-    labels: ['Declarative Memory', 'Creative Synthesis', 'Light Sleep'],
-    datasets: [{
-      data: [4, 3, 1],
-      backgroundColor: ['#3B82F6', '#F59E0B', '#E5E7EB'],
-      borderWidth: 0,
-    }]
-  };
+        pre {
+            background: #1e293b;
+            color: #f8fafc;
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body class="antialiased">
 
-  const rhythmData = {
-    labels: ['Productivity Cycle'],
-    datasets: [
-      { label: 'Sit (Focus)', data: [20], backgroundColor: '#9CA3AF' },
-      { label: 'Stand (Blood)', data: [8], backgroundColor: '#3B82F6' },
-      { label: 'Move (Reset)', data: [2], backgroundColor: '#10B981' }
-    ]
-  };
-
-  return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Biological Hardware Optimization</h1>
-        <p className="text-gray-600 max-w-2xl">Upgrade your cognitive foundation through physiological protocols. We focus on sleep architecture and ergonomic rhythms to prevent mental decay.</p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <h2 className="text-xl font-bold mb-4">The 7-Hour Sleep Architecture</h2>
-          <div className="h-64 flex justify-center">
-            <Doughnut data={sleepData} options={{ maintainAspectRatio: false }} />
-          </div>
-          <div className="mt-4 p-4 bg-blue-50 rounded-xl text-sm text-blue-800">
-            <strong>The 4+3 Rule:</strong> You need the first 4 hours for <em>facts</em> and the last 3 hours for <em>creative synthesis</em>. Skipping the last 3 hours destroys your ability to connect ideas.
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <h2 className="text-xl font-bold mb-4">The 20-8-2 Rhythm</h2>
-          <div className="h-64 flex justify-center">
-            <Bar 
-              data={rhythmData} 
-              options={{ 
-                indexAxis: 'y', 
-                scales: { x: { stacked: true }, y: { stacked: true, display: false } },
-                maintainAspectRatio: false 
-              }} 
-            />
-          </div>
-          <div className="mt-4 space-y-2">
-            <div className="flex items-center gap-3 text-sm p-2 bg-gray-50 rounded-lg">
-              <Coffee className="text-gray-400" size={16} /> 20m Focused Sitting
-            </div>
-            <div className="flex items-center gap-3 text-sm p-2 bg-blue-50 rounded-lg">
-              <Zap className="text-blue-600" size={16} /> 8m Dynamic Standing
-            </div>
-            <div className="flex items-center gap-3 text-sm p-2 bg-green-50 rounded-lg">
-              <CheckCircle2 className="text-green-600" size={16} /> 2m Micro-Movement
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const KnowledgeOSView = ({ paraTab, setParaTab }) => {
-  const paraItems = {
-    projects: { title: 'Projects', color: 'blue', desc: 'Active efforts with a deadline.' },
-    areas: { title: 'Areas', color: 'green', desc: 'Ongoing responsibilities (Health, Finance).' },
-    resources: { title: 'Resources', color: 'amber', desc: 'Themes of ongoing interest.' },
-    archives: { title: 'Archives', color: 'gray', desc: 'Completed or inactive items.' }
-  };
-
-  return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">Knowledge Operating System</h1>
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-8">
-        <div className="grid grid-cols-4 divide-x border-b">
-          {Object.keys(paraItems).map(key => (
-            <button
-              key={key}
-              onClick={() => setParaTab(key)}
-              className={`py-4 text-center text-sm font-bold transition-all ${
-                paraTab === key ? `bg-${paraItems[key].color}-50 text-${paraItems[key].color}-700` : 'text-gray-400 hover:text-gray-600'
-              }`}
-            >
-              {paraItems[key].title}
-            </button>
-          ))}
-        </div>
-        <div className="p-8 bg-white min-h-[120px]">
-          <h3 className="text-xl font-bold mb-2">{paraItems[paraTab].title}</h3>
-          <p className="text-gray-600">{paraItems[paraTab].desc}</p>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const WorkflowView = ({ callGemini, isGenerating, setIsGenerating }) => {
-  const [note, setNote] = useState("");
-  const [distilledNote, setDistilledNote] = useState("");
-
-  const handleDistill = async () => {
-    if (!note) return;
-    setIsGenerating(true);
-    try {
-      const prompt = `Perform "Progressive Summarization" on this raw note. 
-      1. Bold the most unique and useful phrases.
-      2. Provide a 2-sentence Executive Summary at the top.
-      3. Format it beautifully with spacing.
-      Note: ${note}`;
-      
-      const result = await callGemini(prompt, "You are an expert at information architecture and the CODE workflow.");
-      setDistilledNote(result);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <h1 className="text-3xl font-bold text-gray-900 mb-2">The CODE Workflow Engine</h1>
-      <p className="text-gray-600 mb-8">Move information from Capture to Expression using the four stages of digital metabolism.</p>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-1 space-y-4">
-          <div className="p-4 bg-white rounded-xl border border-blue-100 shadow-sm">
-            <h3 className="font-bold flex items-center gap-2 text-blue-700 mb-2"><Workflow size={18}/> 1. Capture</h3>
-            <p className="text-sm text-gray-500">Capture what resonates. Don't worry about where it fits yet.</p>
-          </div>
-          <div className="p-4 bg-white rounded-xl border border-gray-100 shadow-sm opacity-60">
-            <h3 className="font-bold flex items-center gap-2 mb-2"><CheckCircle2 size={18}/> 2. Organize</h3>
-            <p className="text-sm text-gray-500">File into PARA folders based on actionability.</p>
-          </div>
-          <div className="p-4 bg-blue-600 text-white rounded-xl shadow-lg ring-4 ring-blue-100">
-            <h3 className="font-bold flex items-center gap-2 mb-2"><Sparkles size={18}/> 3. Distill</h3>
-            <p className="text-sm text-blue-100">AI-powered summarization to extract the soul of the note.</p>
-          </div>
-          <div className="p-4 bg-white rounded-xl border border-gray-100 shadow-sm opacity-60">
-            <h3 className="font-bold flex items-center gap-2 mb-2"><Zap size={18}/> 4. Express</h3>
-            <p className="text-sm text-gray-500">Create output based on your knowledge base.</p>
-          </div>
-        </div>
-
-        <div className="lg:col-span-2 space-y-4">
-          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-lg">✨ AI Note Distiller</h3>
-              <button 
-                onClick={handleDistill}
-                disabled={isGenerating || !note}
-                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all"
-              >
-                {isGenerating ? 'Processing...' : <><Sparkles size={16} /> Distill with AI ✨</>}
-              </button>
-            </div>
-            <textarea
-              className="w-full h-40 p-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-              placeholder="Paste a long article, messy meeting notes, or ideas here..."
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-            />
-            {distilledNote && (
-              <div className="mt-6 p-6 bg-blue-50 rounded-xl border border-blue-100 prose prose-sm max-w-none">
-                <div className="flex items-center gap-2 text-blue-800 font-bold mb-4">
-                  <BookOpen size={16} /> Distilled Result
-                </div>
-                <div className="text-gray-700 whitespace-pre-wrap leading-relaxed">
-                  {distilledNote}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const LearningLabView = ({ callGemini, isGenerating, setIsGenerating }) => {
-  const [topic, setTopic] = useState("");
-  const [explanation, setExplanation] = useState("");
-
-  const handleFeynman = async () => {
-    if (!topic) return;
-    setIsGenerating(true);
-    try {
-      const prompt = `Explain "${topic}" like I am 5 years old. Use a clever analogy. At the end, list 3 "concept gaps" I might have if I don't understand the fundamentals.`;
-      const result = await callGemini(prompt, "You are an expert tutor specializing in the Feynman Technique.");
-      setExplanation(result);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const chartData = {
-    labels: ['Day 0', 'Day 1', 'Day 2', 'Day 3', 'Day 7', 'Day 14', 'Day 30'],
-    datasets: [
-      {
-        label: 'Passive Reading',
-        data: [100, 30, 20, 15, 10, 5, 2],
-        borderColor: '#9CA3AF',
-        borderDash: [5, 5],
-        tension: 0.4
-      },
-      {
-        label: 'Spaced Repetition',
-        data: [100, 95, 90, 88, 85, 82, 80],
-        borderColor: '#3B82F6',
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        fill: true,
-        tension: 0.4
-      }
-    ]
-  };
-
-  return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">Learning Laboratory</h1>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <h2 className="text-xl font-bold mb-4">Retention Curve Performance</h2>
-          <div className="h-64">
-            <Line data={chartData} options={{ maintainAspectRatio: false }} />
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">✨ Feynman Concept Explorer</h2>
-            <Lightbulb className="text-amber-500" />
-          </div>
-          <p className="text-sm text-gray-500 mb-4">Identify gaps in your understanding by simplifying complex topics with AI.</p>
-          <div className="flex gap-2 mb-4">
-            <input 
-              type="text" 
-              className="flex-grow p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" 
-              placeholder="e.g. Quantum Entanglement"
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-            />
-            <button 
-              onClick={handleFeynman}
-              disabled={isGenerating || !topic}
-              className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white px-4 py-2 rounded-lg font-bold text-sm transition-all"
-            >
-              {isGenerating ? 'Thinking...' : 'Simplify ✨'}
-            </button>
-          </div>
-          {explanation && (
-            <div className="p-4 bg-amber-50 rounded-xl border border-amber-100 flex-grow overflow-auto text-sm leading-relaxed whitespace-pre-wrap">
-              {explanation}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const ActionCenterView = ({ callGemini, journalEntries, setJournalEntries, isGenerating, setIsGenerating }) => {
-  const [prevTask, setPrevTask] = useState("");
-  const [nextTask, setNextTask] = useState("");
-
-  const handleLog = async () => {
-    if (!prevTask || !nextTask) return;
-    setIsGenerating(true);
-    
-    try {
-      const prompt = `I just finished: "${prevTask}". 
-      My next priority is: "${nextTask}". 
-      Provide:
-      1. A "Cognitive Reset" instruction (e.g. deep breath, physical stretch).
-      2. A "Pro Tip" for starting the next task with maximum flow.
-      Keep it brief and encouraging.`;
-      
-      const coachFeedback = await callGemini(prompt, "You are a high-performance productivity coach specializing in task transitions.");
-      
-      const newEntry = {
-        id: Date.now(),
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        prev: prevTask,
-        next: nextTask,
-        feedback: coachFeedback
-      };
-      
-      setJournalEntries([newEntry, ...journalEntries]);
-      setPrevTask("");
-      setNextTask("");
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">Action Center</h1>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <Clock className="text-blue-600" /> Interstitial Log
-          </h2>
-          <div className="space-y-4">
-            <div>
-              <label className="text-xs font-bold text-gray-400 uppercase">Just Finished</label>
-              <input 
-                className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl mt-1 outline-none focus:ring-2 focus:ring-blue-500" 
-                placeholder="Finished emails..."
-                value={prevTask}
-                onChange={(e) => setPrevTask(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-gray-400 uppercase">Starting Next</label>
-              <input 
-                className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl mt-1 outline-none focus:ring-2 focus:ring-blue-500" 
-                placeholder="Writing chapter 1..."
-                value={nextTask}
-                onChange={(e) => setNextTask(e.target.value)}
-              />
-            </div>
-            <button 
-              onClick={handleLog}
-              disabled={isGenerating || !prevTask || !nextTask}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl shadow-lg transition-all flex justify-center items-center gap-2"
-            >
-              {isGenerating ? 'Consulting Coach...' : <>Log & Reset ✨</>}
-            </button>
-          </div>
-        </div>
-
-        <div className="lg:col-span-2 space-y-4">
-          <h2 className="text-lg font-bold text-gray-500">Timeline of Transitions</h2>
-          {journalEntries.length === 0 ? (
-            <div className="p-20 text-center text-gray-400 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-              <MessageSquare className="mx-auto mb-4 opacity-20" size={48} />
-              No entries logged yet. Start your first transition.
-            </div>
-          ) : (
-            journalEntries.map(entry => (
-              <div key={entry.id} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex gap-6 animate-in slide-in-from-left-4">
-                <div className="text-center">
-                  <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">{entry.time}</div>
-                  <div className="h-full w-px bg-gray-100 mx-auto my-2"></div>
-                </div>
-                <div className="flex-grow space-y-4">
-                  <div className="flex items-center gap-4 text-sm">
-                    <div className="px-3 py-1 bg-gray-100 rounded-full text-gray-500 line-through">Done: {entry.prev}</div>
-                    <ArrowRight className="text-blue-500" size={16} />
-                    <div className="px-3 py-1 bg-blue-100 rounded-full text-blue-700 font-bold">Next: {entry.next}</div>
-                  </div>
-                  {entry.feedback && (
-                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 text-sm italic text-gray-600 relative">
-                      <Sparkles className="absolute -top-2 -right-2 text-blue-400" size={20} />
-                      <div className="whitespace-pre-wrap">{entry.feedback}</div>
+    <!-- Navigation -->
+    <nav class="glass-nav fixed w-full z-50 top-0">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center gap-2">
+                    <div class="bg-blue-600 p-1.5 rounded-lg text-white">
+                        <i class="fas fa-brain"></i>
                     </div>
-                  )}
+                    <span class="text-xl font-extrabold tracking-tighter uppercase italic">Cognition<span class="text-blue-600">OS</span></span>
                 </div>
-              </div>
-            ))
-          )}
+                <div class="hidden md:flex items-center space-x-4 text-xs font-bold uppercase tracking-widest text-slate-500">
+                    <span>v2026.1.0</span>
+                    <span class="h-4 w-px bg-slate-300"></span>
+                    <a href="#foundations" class="hover:text-blue-600">Foundations</a>
+                    <a href="#strategies" class="hover:text-blue-600">Strategies</a>
+                    <a href="#pkm" class="hover:text-blue-600">PKM</a>
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-  );
-};
+    </nav>
 
-export default App;
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12 flex flex-col lg:flex-row gap-12">
+        
+        <!-- Desktop Sidebar -->
+        <aside class="hidden lg:block w-64 sticky top-24 h-fit">
+            <div class="space-y-1">
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">System Modules</p>
+                <a href="#foundations" class="sidebar-link block py-2 px-4 text-sm font-semibold text-slate-600">01. Foundations</a>
+                <a href="#strategies" class="sidebar-link block py-2 px-4 text-sm font-semibold text-slate-600">02. Mastery Science</a>
+                <a href="#pkm" class="sidebar-link block py-2 px-4 text-sm font-semibold text-slate-600">03. Second Brain</a>
+                <a href="#energy" class="sidebar-link block py-2 px-4 text-sm font-semibold text-slate-600">04. Runtime Optimization</a>
+                <a href="#environment" class="sidebar-link block py-2 px-4 text-sm font-semibold text-slate-600">05. Environment</a>
+                <a href="#future" class="sidebar-link block py-2 px-4 text-sm font-semibold text-slate-600">06. AI Synthesis</a>
+                <a href="#recommendations" class="sidebar-link block py-2 px-4 text-sm font-semibold text-slate-600">07. Integration</a>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 max-w-4xl">
+            
+            <!-- Hero -->
+            <header class="mb-16">
+                <h1 class="text-4xl md:text-6xl font-black text-slate-900 tracking-tight mb-6">Building a Personalized Learning System</h1>
+                <p class="text-xl text-slate-500 leading-relaxed mb-8">
+                    An exhaustive analysis of neurobiological mechanisms, information architecture, and physiological optimization for the modern knowledge worker.
+                </p>
+                <div class="flex flex-wrap gap-4">
+                    <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide">Neurobiology</span>
+                    <span class="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide">PKM</span>
+                    <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide">AI-Augmented</span>
+                </div>
+            </header>
+
+            <!-- Section 1: Foundations -->
+            <section id="foundations" class="mb-20">
+                <div class="flex items-center gap-4 mb-8">
+                    <span class="text-4xl font-black text-slate-200">01</span>
+                    <h2 class="text-2xl font-bold uppercase tracking-tight">Neurobiological Mechanisms</h2>
+                </div>
+                <div class="prose prose-slate max-w-none text-slate-600 leading-relaxed">
+                    <p class="mb-6">The foundational challenge of learning is the <strong>Forgetting Curve</strong>. Memory is a dynamic process governed by synaptic strength and the relative value assigned by the hippocampus.</p>
+                    
+                    <div class="math-block mb-6">
+                        R = e^(-t/S)
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 my-8">
+                        <div class="card p-6 border-l-4 border-l-blue-600">
+                            <h4 class="font-bold text-slate-900 mb-2">Encoding</h4>
+                            <p class="text-sm">Initial acquisition of information via LTP (Long-Term Potentiation).</p>
+                        </div>
+                        <div class="card p-6 border-l-4 border-l-amber-500">
+                            <h4 class="font-bold text-slate-900 mb-2">Consolidation</h4>
+                            <p class="text-sm">The process of stabilizing memories during NREM and REM sleep stages.</p>
+                        </div>
+                        <div class="card p-6 border-l-4 border-l-green-600">
+                            <h4 class="font-bold text-slate-900 mb-2">Retrieval</h4>
+                            <p class="text-sm">Re-accessing stored information, which signals importance to the hippocampus.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 2: Mastery Science -->
+            <section id="strategies" class="mb-20">
+                <div class="flex items-center gap-4 mb-8">
+                    <span class="text-4xl font-black text-slate-200">02</span>
+                    <h2 class="text-2xl font-bold uppercase tracking-tight">The Science of Mastery</h2>
+                </div>
+                <div class="overflow-hidden card">
+                    <table class="min-w-full divide-y divide-slate-200">
+                        <thead class="bg-slate-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Strategy</th>
+                                <th class="px-6 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Mechanism</th>
+                                <th class="px-6 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">Optimal Use</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200 text-sm">
+                            <tr>
+                                <td class="px-6 py-4 font-bold text-blue-600">Active Recall</td>
+                                <td class="px-6 py-4">Deliberate retrieval without cues.</td>
+                                <td class="px-6 py-4">Definitions, theories.</td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 font-bold text-blue-600">Spaced Repetition</td>
+                                <td class="px-6 py-4">Strategic interval review.</td>
+                                <td class="px-6 py-4">Vocabulary, formulas.</td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 font-bold text-blue-600">Interleaving</td>
+                                <td class="px-6 py-4">Mixing related topics.</td>
+                                <td class="px-6 py-4">Math, sciences.</td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 font-bold text-blue-600">Feynman Technique</td>
+                                <td class="px-6 py-4">Simplification/Analogies.</td>
+                                <td class="px-6 py-4">Complex/Abstract concepts.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Section 3: PKM Architecture -->
+            <section id="pkm" class="mb-20">
+                <div class="flex items-center gap-4 mb-8">
+                    <span class="text-4xl font-black text-slate-200">03</span>
+                    <h2 class="text-2xl font-bold uppercase tracking-tight">The Second Brain</h2>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+                    <div class="card p-8 bg-slate-900 text-white">
+                        <h3 class="text-xs font-black uppercase tracking-widest text-blue-400 mb-4">CODE Workflow</h3>
+                        <ul class="space-y-4 font-bold tracking-tight text-xl">
+                            <li class="flex items-center gap-3"><span class="text-blue-500 text-sm">01.</span> CAPTURE</li>
+                            <li class="flex items-center gap-3"><span class="text-blue-500 text-sm">02.</span> ORGANIZE</li>
+                            <li class="flex items-center gap-3"><span class="text-blue-500 text-sm">03.</span> DISTILL</li>
+                            <li class="flex items-center gap-3"><span class="text-blue-500 text-sm">04.</span> EXPRESS</li>
+                        </ul>
+                    </div>
+                    <div class="card p-8 border-dashed border-2">
+                        <h3 class="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">PARA Methodology</h3>
+                        <div class="space-y-3">
+                            <div class="flex justify-between items-center p-2 bg-blue-50 rounded text-sm"><span class="font-bold">Projects</span><span class="text-xs text-blue-600">Deadlines</span></div>
+                            <div class="flex justify-between items-center p-2 bg-indigo-50 rounded text-sm"><span class="font-bold">Areas</span><span class="text-xs text-indigo-600">Standards</span></div>
+                            <div class="flex justify-between items-center p-2 bg-amber-50 rounded text-sm"><span class="font-bold">Resources</span><span class="text-xs text-amber-600">Interests</span></div>
+                            <div class="flex justify-between items-center p-2 bg-slate-50 rounded text-sm"><span class="font-bold">Archives</span><span class="text-xs text-slate-600">Cold Storage</span></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 4: Runtime/Energy -->
+            <section id="energy" class="mb-20">
+                <div class="flex items-center gap-4 mb-8">
+                    <span class="text-4xl font-black text-slate-200">04</span>
+                    <h2 class="text-2xl font-bold uppercase tracking-tight">Cognitive Runtime Optimization</h2>
+                </div>
+                <div class="prose prose-slate max-w-none text-slate-600 leading-relaxed mb-8">
+                    <p>Productivity in knowledge work is the management of <strong>Mental Energy</strong>, not time. Every task switch incurs a "switching cost" known as <em>Attention Residue</em>.</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="card p-6">
+                        <i class="fas fa-layer-group text-blue-600 text-2xl mb-4"></i>
+                        <h4 class="font-bold mb-2">Deep Work</h4>
+                        <p class="text-sm">90-minute blocks of distraction-free concentration to enter Flow State.</p>
+                    </div>
+                    <div class="card p-6">
+                        <i class="fas fa-redo-alt text-blue-600 text-2xl mb-4"></i>
+                        <h4 class="font-bold mb-2">Interstitial Journaling</h4>
+                        <p class="text-sm">Logging transitions to bridge intentions and clear the cognitive cache.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 5: Future AI -->
+            <section id="future" class="mb-20">
+                <div class="flex items-center gap-4 mb-8">
+                    <span class="text-4xl font-black text-slate-200">06</span>
+                    <h2 class="text-2xl font-bold uppercase tracking-tight">2026 AI Trends</h2>
+                </div>
+                <div class="bg-blue-600 rounded-2xl p-8 text-white">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                            <h3 class="font-bold text-xl mb-4">Agentic AI Synthesis</h3>
+                            <p class="text-blue-100 text-sm">LLMs with 200k token context windows now actively plan and execute research synthesis across PARA folders.</p>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-4">Semantic Retrieval</h3>
+                            <p class="text-blue-100 text-sm">Keyword search is obsolete. Semantic maps understand intent, retrieving context-aware insights from entire repositories.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 6: Recommendations -->
+            <section id="recommendations" class="mb-20">
+                <div class="flex items-center gap-4 mb-8">
+                    <span class="text-4xl font-black text-slate-200">07</span>
+                    <h2 class="text-2xl font-bold uppercase tracking-tight">Strategic Implementation</h2>
+                </div>
+                <div class="space-y-4">
+                    <div class="flex gap-6 p-6 card">
+                        <div class="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center font-bold text-slate-900 flex-shrink-0">1</div>
+                        <div>
+                            <h4 class="font-bold mb-1">Stabilize the Biological Foundation</h4>
+                            <p class="text-sm text-slate-500">7-hour sleep minimum and Cornell 20-8-2 movement protocol.</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-6 p-6 card">
+                        <div class="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center font-bold text-slate-900 flex-shrink-0">2</div>
+                        <div>
+                            <h4 class="font-bold mb-1">Architect for Action</h4>
+                            <p class="text-sm text-slate-500">Apply PARA across all digital platforms to reduce cognitive friction.</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-6 p-6 card">
+                        <div class="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center font-bold text-slate-900 flex-shrink-0">3</div>
+                        <div>
+                            <h4 class="font-bold mb-1">Adopt Desirable Difficulties</h4>
+                            <p class="text-sm text-slate-500">Replace passive review with Active Recall and Spaced Repetition systems.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <footer class="pt-12 border-t border-slate-200 text-slate-400 text-xs flex justify-between items-center">
+                <p>CognitionOS Protocol v2.5</p>
+                <p>&copy; 2026 Semantic Learning Architectures</p>
+            </footer>
+
+        </main>
+    </div>
+
+</body>
+</html>
